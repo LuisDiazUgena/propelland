@@ -1,0 +1,151 @@
+/*
+*	SimpleHttpServer 
+*/
+
+var ipRpi  = '192.168.1.43'
+ui.backgroundColor(50, 50, 50);
+
+ui.toolbar.title("PROPELLAND");
+ui.toolbar.bgColor(55, 155, 155, 255);
+ui.toolbar.show(true);
+//Add a label with text
+
+var var2 = network.ipAddress();
+console.log(var2);
+ui.toast("IP:"+var2);
+
+
+//add android plots 
+var plotTemp = ui.addPlot(10, 10, ui.screenWidth, 200, 0, 100); 
+var plotCPU = ui.addPlot(0, 360, ui.screenWidth, 200, 0, 100); 
+
+//plot.setThickness(15);
+plotTemp.setDefinition(2);
+plotCPU.setDefinition(2);
+
+var server = network.createSimpleHttpServer(8082);
+
+var temp;
+var cpu;
+var disk;
+
+server.onNewRequest(function(url, method, header, parms, files) {
+    // console.log(url, method, header,parms);
+    
+    //serves pure text to a given GET command
+    if (url == "/api/rpi") {
+        params = parms.toString();
+        var index=0;
+        var res = params.split(",")
+        for (var p in res){
+            values = res[p].split("=");
+            if(index==0){temp=values[1]};
+            if(index==1){cpu=values[1]};
+            if(index==2){disk=values[1]};
+            index=index+1;
+        }
+        
+        disk = disk.replace('}','');
+        temp = parseFloat(temp);
+        cpu = parseFloat(cpu);
+        disk = parseFloat(disk);
+        
+        // console.log("temp:"+temp)
+        // console.log("cpu:"+cpu)
+        // console.log("disk:"+disk)
+        
+        plotCPU.update("CPU", cpu);
+        plotTemp.update("Temp",temp);
+        
+        return server.response("ACK");
+    //return files in the current project folder
+    }
+});
+
+var pin;
+var state=0;
+ui.screenMode("portrait");
+
+var xbtn = 0
+var yBtn = ui.screenHeight - 460;
+
+ui.addInput("Pin number",  xbtn, yBtn, ui.screenWidth/3, 150).onChange(function(val){ 
+    // console.log(val);
+    pin = val;
+});
+
+
+//Add a toggle button
+var nombre = ui.addCheckbox("", ui.screenWidth*1/3, yBtn, ui.screenWidth/3, 150, false).onChange(function(val) {
+        if(val){
+            state=1;
+        }else{
+            state=0;
+        }
+});
+
+ui.addButton("Set state", ui.screenWidth/2, yBtn, ui.screenWidth/2.5, 150).onClick(function() { 
+    console.log("pin number: "+pin);
+    console.log("pin state: "+state);
+    
+    var sendStr = 'http://'+ipRpi+':8081/api/gpio?gpio='+pin+'&state='+state;
+    console.log(sendStr);
+    // server.response(sendStr);
+    network.httpGet(sendStr, function(status, response) { 
+        console.log(status + " " + response);   
+    });
+    
+});
+ui.addText("TEMP", 0, 275, 100, 100);
+var canvasTemp = ui.addCanvas(100, 250, ui.screenWidth-110, 100);
+var canvasCpu = ui.addCanvas(100, 600, ui.screenWidth-110, 100);
+var canvasDisk = ui.addCanvas(100, 740, ui.screenWidth-110, 100);
+
+
+canvasTemp.loopDraw(35, function() {
+    canvasTemp.clear();
+    canvasTemp.fill(200, 200, 200, 90);
+    canvasTemp.rect(0, 0, canvasTemp.getWidth(), 100);
+    canvasTemp.fill(55, 155, 155);
+    var mx = temp/100*canvasTemp.getWidth();
+    canvasTemp.rect(0, 0, mx, 100);
+    canvasTemp.fill(0, 0, 0);
+    var var2 = canvasTemp.textSize(50);
+    var var0 = canvasTemp.text(temp, 10, 60);
+    
+});
+
+ui.addText("CPU%", 0, 625, 100, 100);
+
+canvasCpu.loopDraw(1000, function() {
+    canvasCpu.clear();
+    canvasCpu.fill(200, 200, 200, 90);
+    canvasCpu.rect(0, 0, canvasTemp.getWidth(), 100);
+    canvasCpu.fill(55, 155, 155);
+    
+    var mx = cpu/100*canvasCpu.getWidth();
+    canvasCpu.rect(0, 0, mx, 100);
+    
+    canvasCpu.fill(0, 0, 0);
+    var var2 = canvasCpu.textSize(50);
+    var var0 = canvasCpu.text(Math.round(cpu * 100) / 100, 10, 60);
+    
+});
+
+ui.addText("Disk%", 0, 765, 100, 100);
+
+canvasDisk.loopDraw(1000, function() {
+    canvasDisk.clear();
+    canvasDisk.fill(200, 200, 200, 90);
+    canvasDisk.rect(0, 0, canvasTemp.getWidth(), 100);
+    canvasDisk.fill(55, 155, 155);
+    
+    var mx = disk/100*canvasDisk.getWidth();
+    canvasDisk.rect(0, 0, mx, 100);
+    
+    canvasDisk.fill(0, 0, 0);
+    var var2 = canvasDisk.textSize(50);
+    var var0 = canvasDisk.text(disk, 10, 60);
+    
+});
+
